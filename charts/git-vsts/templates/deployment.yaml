@@ -1,0 +1,131 @@
+{{- $fullName := include "helm-starter.fullname" . -}}
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ template "helm-starter.fullname" . }}
+  labels:
+    app: {{ template "helm-starter.name" . }}
+    chart: {{ template "helm-starter.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- with .Values.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "helm-starter.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "helm-starter.name" . }}
+        release: {{ .Release.Name }}
+      annotations:
+{{- if .Values.alwaysUpdate }}
+        checksum/update: {{ .Release.Time.String | sha256sum }}
+{{- end}}
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+{{- with .Values.podAnnotations }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- with .Values.args }}
+          args:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.env }}
+          env:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- if .Values.envFrom }}
+          envFrom:
+{{- range $key, $value := .Values.envFrom }}
+            - configMapRef:
+                name: {{ $fullName }}-{{ $value.name }}
+{{- end}}
+{{- end}}
+{{- if .Values.service.enabled }}
+          ports:
+{{- range $key, $value := .Values.service.ports }}
+          - name: {{ $value.name }}
+            containerPort: {{ $value.targetPort }}
+{{- end}}
+{{- end}}
+{{- if or .Values.configMaps .Values.secrets}}
+          volumeMounts:
+  {{- range $key, $value := .Values.configMaps }}
+    {{- if $value.mountPath }}
+            - mountPath: {{ $value.mountPath }}
+              name: {{ $value.name }}
+    {{- end }}
+  {{- end }}
+  {{- range $key, $value := .Values.secrets }}
+    {{- if $value.mountPath }}
+            - mountPath: {{ $value.mountPath }}
+              name: {{ $value.name }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- with .Values.livenessProbe }}
+          livenessProbe:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.readinessProbe }}
+          readinessProbe:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.resources }}
+          resources:
+{{ toYaml . | indent 12 }}
+{{- end }}
+{{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+{{- end }}
+
+{{- if or .Values.configMaps .Values.secrets }}
+      volumes:
+  {{- range $key, $value := .Values.configMaps }}
+
+    {{- if $value.mountPath }}
+        - name: {{ $value.name }}
+          configMap:
+          {{- if $value.configName }}
+            name: {{ $value.configName }}
+          {{- else }}
+            name: {{ $fullName }}-{{ $value.name }}
+          {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- range $key, $value := .Values.secrets }}
+    {{- if $value.mountPath }}
+        - name: {{ $value.name }}
+          secret:
+          {{- if $value.secretName }}
+            secretName: {{ $value.secretName }}
+          {{- else }}
+            secretName: {{ $fullName }}-{{ $value.name }}
+          {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,41 @@
+replicaCount: 1
+
+alwaysUpdate: true
+
+image:
+  repository: go-vsts
+  tag: latest
+
+imagePullSecrets:
+  - name: quay-io-credential
+
+# Check container is alive and healthy
+# If not, the kubelet kills the Container and restarts it.
+livenessProbe:
+  tcpSocket:
+    port: http
+
+# Ensure the traffic does not reach a container which is not ready for it,
+readinessProbe:
+  tcpSocket:
+    port: http
+
+service:
+  enabled: true
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  hosts:
+    - host: example.com
+      path: /
+      servicePort: http
+  tls:
+   - secretName: example-tls
+     hosts:
+       - example.com
